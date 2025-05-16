@@ -4,28 +4,25 @@ const app = express();
 
 app.use(express.json());
 
-// Rota simples para testar se o bot está online
+// Rota de teste
 app.get('/', (req, res) => {
   res.send('✅ Leona bot está online!');
 });
 
-// Rota para receber mensagens da Z-API
+// Rota de webhook
 app.post('/webhook', async (req, res) => {
   console.log('📩 Corpo recebido da Z-API:', JSON.stringify(req.body, null, 2));
 
   const mensagem = req.body.text?.message || '';
   const numero = req.body.phone || '';
 
-  // Verifica se recebeu mensagem e número válidos
   if (mensagem && numero) {
     console.log('✅ Mensagem recebida:', mensagem);
     console.log('📞 Número do remetente:', numero);
 
-    // Mensagem da Leona
     const resposta = 'Olá! 👋 Aqui é a Leona, sua atendente virtual. Como posso te ajudar?';
 
     try {
-      // Envia a resposta pela API da Z-API
       await axios.post(
         process.env.ZAPI_URL,
         {
@@ -34,14 +31,11 @@ app.post('/webhook', async (req, res) => {
         },
         {
           headers: {
-            'Content-Type': 'application/json'
-          },
-          params: {
-            token: process.env.ZAPI_KEY
+            'Content-Type': 'application/json',
+            'Client-Token': process.env.ZAPI_KEY
           }
         }
       );
-
       console.log('✅ Mensagem enviada com sucesso!');
     } catch (error) {
       console.error('❌ Erro ao enviar uma resposta:', error.response?.data || error.message);
@@ -53,7 +47,6 @@ app.post('/webhook', async (req, res) => {
   res.sendStatus(200);
 });
 
-// Inicia o servidor
 app.listen(3000, () => {
   console.log('🚀 Servidor Leona rodando na porta 3000');
 });
