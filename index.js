@@ -5,16 +5,18 @@ const app = express();
 
 app.use(express.json());
 
-// 🌐 Endpoint de verificação
+// 🧠 Memória temporária por número (simples e funcional)
+const historicoConversas = {};
+
+// 🧪 Teste do servidor
 app.get('/', (req, res) => {
-  res.send('🤖 Leona bot com IA está online!');
+  res.send('🤖 Leona bot com IA turbo está online!');
 });
 
-// 📩 Webhook que recebe mensagens da Z-API
+// 📩 Webhook de mensagens da Z-API
 app.post('/webhook', async (req, res) => {
-  console.log('📦 Corpo recebido da Z-API:', JSON.stringify(req.body, null, 2));
+  console.log('📨 Corpo recebido da Z-API:', JSON.stringify(req.body, null, 2));
 
-  // 🧩 Captura de mensagem e número
   const mensagem =
     req.body.message ||
     req.body.text?.message ||
@@ -28,29 +30,48 @@ app.post('/webhook', async (req, res) => {
     req.body.body?.phone ||
     '';
 
+  const enviadaPorMim = req.body.fromMe || req.body.self || false;
+
+  // ❌ Prevenir loops de mensagens
+  if (enviadaPorMim) {
+    console.log('⚠️ Ignorado: mensagem enviada pela própria Leona.');
+    return res.sendStatus(200);
+  }
+
   if (mensagem && numero) {
-    console.log('✅ Mensagem recebida:', mensagem);
-    console.log('📞 Número do remetente:', numero);
+    console.log('✅ Nova mensagem de:', numero, '| Conteúdo:', mensagem);
 
-    let resposta = '🤖 Oi! Como posso te ajudar hoje?';
+    // 🧠 Histórico: inicializa array se necessário
+    if (!historicoConversas[numero]) {
+      historicoConversas[numero] = [];
+    }
 
-    // 🧠 Geração de resposta com OpenAI
+    historicoConversas[numero].push({ role: 'user', content: mensagem });
+
+    const promptSistema = `
+Você é a Leona, uma atendente virtual extremamente inteligente, simpática, persuasiva e atenciosa.
+Sempre responda com educação, objetividade e com linguagem informal e natural, como uma pessoa real.
+Seu objetivo é ajudar o cliente, tirar dúvidas, captar informações para orçamentos e vender produtos.
+Nunca diga que é uma IA, nunca diga que é um modelo de linguagem, apenas se comporte como uma atendente humana.
+Se a pessoa pedir orçamento, pergunte tudo que precisar antes de gerar.
+Se o cliente falar algo fora do contexto, redirecione com leveza e bom humor.
+`;
+
+    const mensagensGPT = [
+      { role: 'system', content: promptSistema },
+      ...historicoConversas[numero].slice(-5) // mantém até 5 últimas mensagens
+    ];
+
+    let resposta = '🤖 Desculpe, houve um erro ao processar sua mensagem.';
+
+    // 🧠 Chamada à OpenAI
     try {
       const openaiResponse = await axios.post(
         'https://api.openai.com/v1/chat/completions',
         {
           model: 'gpt-3.5-turbo',
-          messages: [
-            {
-              role: 'system',
-              content: 'Você é a Leona, uma atendente virtual simpática, cordial e eficiente.'
-            },
-            {
-              role: 'user',
-              content: mensagem
-            }
-          ],
-          temperature: 0.7
+          messages: mensagensGPT,
+          temperature: 0.9
         },
         {
           headers: {
@@ -61,15 +82,14 @@ app.post('/webhook', async (req, res) => {
       );
 
       resposta = openaiResponse.data.choices[0].message.content;
-      console.log('🧠 Resposta gerada pela IA:', resposta);
+      historicoConversas[numero].push({ role: 'assistant', content: resposta });
+      console.log('💬 Resposta gerada pela IA:', resposta);
     } catch (error) {
-      console.error('❌ Erro ao chamar a OpenAI:', error.response?.data || error.message);
+      console.error('❌ Erro ao gerar resposta da IA:', error.response?.data || error.message);
     }
 
-    // 🚀 Envio da resposta via Z-API com token de segurança da conta
+    // 🚀 Envia resposta via Z-API
     try {
-      console.log('🔐 Enviando com Client-Token:', process.env.ZAPI_KEY);
-
       const zapResponse = await axios.post(
         process.env.ZAPI_URL,
         {
@@ -84,13 +104,13 @@ app.post('/webhook', async (req, res) => {
         }
       );
 
-      console.log('✅ Mensagem enviada via Z-API:', zapResponse.data);
+      console.log('✅ Mensagem enviada com sucesso via Z-API:', zapResponse.data);
     } catch (error) {
       const erroMsg = error.response?.data || error.message;
-      console.error('❌ ERRO ao enviar resposta via Z-API:', erroMsg);
+      console.error('❌ Erro ao enviar mensagem via Z-API:', erroMsg);
     }
   } else {
-    console.log('⚠️ Mensagem ou número inválido');
+    console.log('⚠️ Mensagem ou número inválido recebido.');
   }
 
   res.sendStatus(200);
@@ -99,5 +119,5 @@ app.post('/webhook', async (req, res) => {
 // 🚀 Inicializa servidor
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`🚀 Leona bot rodando na porta ${PORT}`);
+  console.log(`🚀 Leona bot 2.0 rodando na porta ${PORT}`);
 });
