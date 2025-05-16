@@ -6,9 +6,8 @@ const app = express();
 
 app.use(express.json());
 
-// Rota de teste
 app.get('/', (req, res) => {
-  res.send('✅ Leona bot com IA está online!');
+  res.send('🤖 Leona bot com IA está online!');
 });
 
 app.post('/webhook', async (req, res) => {
@@ -31,7 +30,6 @@ app.post('/webhook', async (req, res) => {
     console.log('✅ Mensagem recebida:', mensagem);
     console.log('📞 Número do remetente:', numero);
 
-    // Gera resposta com IA
     let resposta = '🤖 Desculpe, houve um erro ao processar sua mensagem.';
 
     try {
@@ -40,7 +38,7 @@ app.post('/webhook', async (req, res) => {
         {
           model: 'gpt-3.5-turbo',
           messages: [
-            { role: 'system', content: 'Você é a Leona, uma assistente virtual educada, prestativa e simpática.' },
+            { role: 'system', content: 'Você é a Leona, uma atendente educada, simpática e prestativa.' },
             { role: 'user', content: mensagem }
           ],
           temperature: 0.7
@@ -59,21 +57,20 @@ app.post('/webhook', async (req, res) => {
       console.error('❌ Erro ao chamar a OpenAI:', error.response?.data || error.message);
     }
 
-    // Envia resposta pro WhatsApp via Z-API
+    // ✅ ENVIO CORRETO com Client-Token
     try {
-      const zapResponse = await axios.post(
-        process.env.ZAPI_URL,
-        {
+      const zapResponse = await axios({
+        method: 'post',
+        url: process.env.ZAPI_URL,
+        data: {
           phone: numero,
           message: resposta
         },
-        {
-          headers: {
-            'Content-Type': 'application/json',
-            'Client-Token': process.env.ZAPI_KEY
-          }
+        headers: {
+          'Content-Type': 'application/json',
+          'Client-Token': process.env.ZAPI_KEY
         }
-      );
+      });
 
       console.log('✅ Mensagem enviada via Z-API:', zapResponse.data);
     } catch (error) {
@@ -89,5 +86,5 @@ app.post('/webhook', async (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`🚀 Servidor Leona com IA rodando na porta ${PORT}`);
+  console.log(`🚀 Leona bot rodando na porta ${PORT}`);
 });
