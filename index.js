@@ -21,7 +21,11 @@ app.post("/webhook", async (req, res) => {
   const message = req.body.message?.text?.body;
   const phone = req.body.contacts?.[0]?.wa_id;
 
+  console.log("👉 Mensagem recebida:", message);
+  console.log("👉 Número do cliente:", phone);
+
   if (!message || !phone) {
+    console.log("❌ Dados inválidos");
     return res.status(400).send("Dados inválidos");
   }
 
@@ -34,7 +38,7 @@ app.post("/webhook", async (req, res) => {
           {
             role: "system",
             content:
-              "Você é Leona, vendedora da loja de gesso e drywall. Atenda com simpatia, naturalidade e inteligência. Seu objetivo é entender o perfil do cliente (nome, cidade ou CEP, se precisa de material ou serviço, e se é arquiteto, engenheiro ou cliente final), mas de forma sutil, como quem está puxando papo, sem parecer robô. Nunca diga que é uma IA. Responda como uma vendedora humana, rápida e experiente."
+              "Você é Leona, vendedora da loja de gesso e drywall. Atenda com simpatia, naturalidade e inteligência. Seu objetivo é entender o perfil do cliente (nome, cidade ou CEP, se precisa de material ou serviço, e se é arquiteto, engenheiro ou cliente final), mas de forma sutil, como quem está puxando papo. Nunca diga que é uma IA."
           },
           {
             role: "user",
@@ -54,22 +58,24 @@ app.post("/webhook", async (req, res) => {
     const reply = openaiResponse.data.choices[0].message.content;
     const delay = calcularDelay(reply);
 
-    // Aguarda o delay antes de enviar a resposta
+    console.log("🗨️ Resposta da IA:", reply);
+
     setTimeout(async () => {
       await axios.post(`${ZAPI_URL}/sendMessage?token=${ZAPI_TOKEN}`, {
         phone: phone,
         body: reply
       });
+      console.log("✅ Mensagem enviada ao cliente.");
     }, delay);
 
     res.sendStatus(200);
   } catch (err) {
-    console.error("Erro:", err.response?.data || err.message);
+    console.error("❌ Erro ao processar:", err.response?.data || err.message);
     res.sendStatus(500);
   }
 });
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`Servidor rodando na porta ${PORT}`);
+  console.log(`🚀 Servidor rodando na porta ${PORT}`);
 });
