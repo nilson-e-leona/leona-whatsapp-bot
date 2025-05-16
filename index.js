@@ -18,12 +18,6 @@ app.get('/', (req, res) => {
 app.post('/webhook', async (req, res) => {
   console.log('📨 Webhook recebido:', JSON.stringify(req.body, null, 2));
 
-  const mensagemTexto =
-    req.body.message ||
-    req.body.text?.message ||
-    req.body.body?.text ||
-    '';
-
   const numero =
     req.body.from ||
     req.body.phone ||
@@ -31,11 +25,22 @@ app.post('/webhook', async (req, res) => {
     req.body.body?.phone ||
     '';
 
-  const enviadaPorMim = req.body.fromMe || req.body.self || false;
   const tipo = req.body.type || req.body.body?.type || '';
+  const mensagemTexto =
+    req.body.message ||
+    req.body.text?.message ||
+    req.body.body?.text ||
+    '';
 
+  const enviadaPorMim =
+    req.body.fromMe === true ||
+    req.body.self === true ||
+    req.body.author === numero ||
+    req.body.ack === 1;
+
+  // 🔒 BLOQUEIO DE AUTO-RESPOSTA (anti-loop completo)
   if (enviadaPorMim) {
-    console.log('⚠️ Ignorado: mensagem enviada pela Leona.');
+    console.log('⚠️ Ignorado: mensagem enviada pela própria Leona (bloqueio anti-loop ativo)');
     return res.sendStatus(200);
   }
 
@@ -46,12 +51,10 @@ app.post('/webhook', async (req, res) => {
 
   let resposta = '🤖 Desculpe, não entendi sua mensagem. Pode tentar novamente?';
 
-  // Inicializa histórico
   if (!historicoConversas[numero]) historicoConversas[numero] = [];
 
   try {
     if (tipo === 'image') {
-      // 📷 INTERPRETAÇÃO DE IMAGEM
       const imageUrl = req.body.body?.url;
       if (imageUrl) {
         const visionPayload = {
@@ -83,7 +86,6 @@ app.post('/webhook', async (req, res) => {
       }
 
     } else if (tipo === 'ptt' || tipo === 'audio') {
-      // 🎧 TRANSCRIÇÃO DE ÁUDIO
       const audioUrl = req.body.body?.url;
       const localPath = path.join(__dirname, 'audio.ogg');
 
@@ -111,10 +113,8 @@ app.post('/webhook', async (req, res) => {
 
       const transcricao = whisperResp.data.text;
       resposta = `Você disse: "${transcricao}"`;
-
       historicoConversas[numero].push({ role: 'user', content: transcricao });
     } else {
-      // 💬 MENSAGEM DE TEXTO NORMAL
       historicoConversas[numero].push({ role: 'user', content: mensagemTexto });
 
       const mensagens = [
@@ -149,7 +149,7 @@ Se alguém mandar imagens ou áudio, processe com sabedoria.
       historicoConversas[numero].push({ role: 'assistant', content: resposta });
     }
 
-    // 🚀 Envia resposta pro WhatsApp via Z-API
+    // 🚀 Envia resposta para o WhatsApp via Z-API
     const zapResp = await axios.post(
       process.env.ZAPI_URL,
       {
@@ -172,8 +172,7 @@ Se alguém mandar imagens ou áudio, processe com sabedoria.
   res.sendStatus(200);
 });
 
-// 🚀 Inicializa servidor
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`🚀 Leona 2.5 (multimídia) rodando na porta ${PORT}`);
+  console.log(`🚀 Leona 2.6 multimídia rodando na porta ${PORT}`);
 });
