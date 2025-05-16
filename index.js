@@ -1,5 +1,5 @@
-// 🧠 Leona WhatsApp Bot - inicialização
-require('dotenv').config(); // ← Carrega variáveis do .env
+require('dotenv').config(); // Carrega variáveis do .env
+
 const express = require('express');
 const axios = require('axios');
 const app = express();
@@ -11,12 +11,23 @@ app.get('/', (req, res) => {
   res.send('✅ Leona bot está online!');
 });
 
-// Rota de Webhook Z-API
+// Webhook da Z-API
 app.post('/webhook', async (req, res) => {
   console.log('📩 Corpo recebido da Z-API:', JSON.stringify(req.body, null, 2));
 
-  const mensagem = req.body.text?.message || '';
-  const numero = req.body.from || '';
+  // Captura mensagem e número com fallback de formatos
+  const mensagem =
+    req.body.message ||
+    req.body.text?.message ||
+    req.body.body?.text ||
+    '';
+
+  const numero =
+    req.body.from ||
+    req.body.phone ||
+    req.body.telefone ||
+    req.body.body?.phone ||
+    '';
 
   if (mensagem && numero) {
     console.log('✅ Mensagem recebida:', mensagem);
@@ -52,7 +63,7 @@ app.post('/webhook', async (req, res) => {
   res.sendStatus(200);
 });
 
-// Servidor escutando na porta 3000
+// Porta do servidor
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`🚀 Servidor Leona rodando na porta ${PORT}`);
