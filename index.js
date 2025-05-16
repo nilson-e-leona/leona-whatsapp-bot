@@ -55,7 +55,15 @@ app.post("/webhook", async (req, res) => {
       }
     );
 
-    const reply = openaiResponse.data.choices[0].message.content;
+    console.log("🧠 Resposta completa da OpenAI:", openaiResponse.data);
+
+    const reply = openaiResponse.data?.choices?.[0]?.message?.content;
+
+    if (!reply) {
+      console.log("❌ A resposta da IA veio vazia ou com erro.");
+      return res.status(500).send("Erro ao gerar resposta");
+    }
+
     const delay = calcularDelay(reply);
 
     console.log("🗨️ Resposta da IA:", reply);
