@@ -18,86 +18,64 @@ function calcularDelay(texto) {
 }
 
 app.post("/webhook", async (req, res) => {
-  let message;
-  let phone = req.body.phone;
-
-  if (typeof req.body === "object") {
-    if (typeof req.body.message === "string") {
-      message = req.body.message;
-    } else if (typeof req.body.body === "string") {
-      message = req.body.body;
-    } else if (typeof req.body.body === "object" && req.body.body.mensagem) {
-      message = req.body.body.mensagem;
-    } else if (typeof req.body.mensagem === "string") {
-      message = req.body.mensagem;
-    } else if (req.body.body && req.body.body.text) {
-      message = req.body.body.text;
-    }
-  }
-
-  console.log("👉 Mensagem recebida:", message);
-  console.log("👉 Número do cliente:", phone);
-
-  if (!message || !phone) {
-    console.log("❌ Dados inválidos");
-    return res.status(400).send("Dados inválidos");
-  }
-
   try {
-    const openaiResponse = await axios.post(
+    const data = req.body;
+
+    // Compatível com estrutura Z-API
+    const mensagem = data?.messages?.[0]?.text?.body;
+    const numero = data?.messages?.[0]?.from;
+
+    console.log("Mensagem recebida:", mensagem);
+    console.log("Número do cliente:", numero);
+
+    if (!mensagem || !numero) {
+      console.log("Dados inválidos");
+      return res.sendStatus(400);
+    }
+
+    const prompt = `Responda como uma vendedora experiente chamada Leona. Seja simpática, direta e boa de venda. O cliente disse: "${mensagem}"`;
+
+    const respostaIA = await axios.post(
       "https://api.openai.com/v1/chat/completions",
       {
         model: "gpt-4",
-        messages: [
-          {
-            role: "system",
-            content:
-              "Você é Leona, vendedora da loja de gesso e drywall. Atenda com simpatia, naturalidade e inteligência. Seu objetivo é entender o perfil do cliente (nome, cidade ou CEP, se precisa de material ou serviço, e se é arquiteto, engenheiro ou cliente final), mas de forma sutil, como quem está puxando papo. Nunca diga que é uma IA."
-          },
-          {
-            role: "user",
-            content: message
-          }
-        ],
-        temperature: 0.7
+        messages: [{ role: "user", content: prompt }],
       },
       {
         headers: {
+          Authorization: `Bearer ${OPENAI_API_KEY}`,
           "Content-Type": "application/json",
-          Authorization: `Bearer ${OPENAI_API_KEY}`
-        }
+        },
       }
     );
 
-    console.log("🧠 Resposta completa da OpenAI:", openaiResponse.data);
+    const resposta = respostaIA.data.choices[0].message.content;
+    console.log("Resposta da IA:", resposta);
 
-    const reply = openaiResponse.data?.choices?.[0]?.message?.content;
+    await new Promise((r) => setTimeout(r, calcularDelay(resposta)));
 
-    if (!reply) {
-      console.log("❌ A resposta da IA veio vazia ou com erro.");
-      return res.status(500).send("Erro ao gerar resposta");
-    }
-
-    const delay = calcularDelay(reply);
-
-    console.log("🗨️ Resposta da IA:", reply);
-
-    setTimeout(async () => {
-      await axios.post(`${ZAPI_URL}/sendMessage?token=${ZAPI_TOKEN}`, {
-        phone: phone,
-        body: reply
-      });
-      console.log("✅ Mensagem enviada ao cliente.");
-    }, delay);
+    await axios.post(
+      `${ZAPI_URL}`,
+      {
+        phone: numero,
+        message: resposta,
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${ZAPI_TOKEN}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
 
     res.sendStatus(200);
-  } catch (err) {
-    console.error("❌ Erro ao processar:", err.response?.data || err.message);
+  } catch (error) {
+    console.error("Erro no webhook:", error.response?.data || error.message);
     res.sendStatus(500);
   }
 });
 
 const PORT = process.env.PORT || 1000;
 app.listen(PORT, () => {
-  console.log(`🚀 Servidor rodando na porta ${PORT}`);
+  console.log(`Servidor rodando na porta ${PORT}`);
 });
