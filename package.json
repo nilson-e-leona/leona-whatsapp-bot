@@ -1,5 +1,5 @@
 {
-  "name": "leona-whatsapp-bot",
+  "name": "leona-bot-do-whatsapp",
   "version": "1.0.0",
   "description": "Leona - vendedora IA de gesso e drywall via WhatsApp",
   "main": "index.js",
