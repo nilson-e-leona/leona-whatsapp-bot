@@ -2,22 +2,23 @@ require('dotenv').config();
 const express = require('express');
 const axios = require('axios');
 const app = express();
+const FormData = require('form-data');
+const fs = require('fs');
+const https = require('https');
+const path = require('path');
 
 app.use(express.json());
 
-// 🧠 Memória temporária por número (simples e funcional)
 const historicoConversas = {};
 
-// 🧪 Teste do servidor
 app.get('/', (req, res) => {
-  res.send('🤖 Leona bot com IA turbo está online!');
+  res.send('🤖 Leona IA multimídia está online!');
 });
 
-// 📩 Webhook de mensagens da Z-API
 app.post('/webhook', async (req, res) => {
-  console.log('📨 Corpo recebido da Z-API:', JSON.stringify(req.body, null, 2));
+  console.log('📨 Webhook recebido:', JSON.stringify(req.body, null, 2));
 
-  const mensagem =
+  const mensagemTexto =
     req.body.message ||
     req.body.text?.message ||
     req.body.body?.text ||
@@ -31,86 +32,141 @@ app.post('/webhook', async (req, res) => {
     '';
 
   const enviadaPorMim = req.body.fromMe || req.body.self || false;
+  const tipo = req.body.type || req.body.body?.type || '';
 
-  // ❌ Prevenir loops de mensagens
   if (enviadaPorMim) {
-    console.log('⚠️ Ignorado: mensagem enviada pela própria Leona.');
+    console.log('⚠️ Ignorado: mensagem enviada pela Leona.');
     return res.sendStatus(200);
   }
 
-  if (mensagem && numero) {
-    console.log('✅ Nova mensagem de:', numero, '| Conteúdo:', mensagem);
+  if (!numero) {
+    console.log('⚠️ Número não encontrado.');
+    return res.sendStatus(200);
+  }
 
-    // 🧠 Histórico: inicializa array se necessário
-    if (!historicoConversas[numero]) {
-      historicoConversas[numero] = [];
-    }
+  let resposta = '🤖 Desculpe, não entendi sua mensagem. Pode tentar novamente?';
 
-    historicoConversas[numero].push({ role: 'user', content: mensagem });
+  // Inicializa histórico
+  if (!historicoConversas[numero]) historicoConversas[numero] = [];
 
-    const promptSistema = `
-Você é a Leona, uma atendente virtual extremamente inteligente, simpática, persuasiva e atenciosa.
-Sempre responda com educação, objetividade e com linguagem informal e natural, como uma pessoa real.
-Seu objetivo é ajudar o cliente, tirar dúvidas, captar informações para orçamentos e vender produtos.
-Nunca diga que é uma IA, nunca diga que é um modelo de linguagem, apenas se comporte como uma atendente humana.
-Se a pessoa pedir orçamento, pergunte tudo que precisar antes de gerar.
-Se o cliente falar algo fora do contexto, redirecione com leveza e bom humor.
-`;
+  try {
+    if (tipo === 'image') {
+      // 📷 INTERPRETAÇÃO DE IMAGEM
+      const imageUrl = req.body.body?.url;
+      if (imageUrl) {
+        const visionPayload = {
+          model: 'gpt-4-vision-preview',
+          messages: [
+            {
+              role: 'user',
+              content: [
+                { type: 'text', text: 'Analise a imagem e me diga o que vê (parece uma lista de materiais).' },
+                { type: 'image_url', image_url: { url: imageUrl } }
+              ]
+            }
+          ],
+          max_tokens: 1000
+        };
 
-    const mensagensGPT = [
-      { role: 'system', content: promptSistema },
-      ...historicoConversas[numero].slice(-5) // mantém até 5 últimas mensagens
-    ];
+        const visionResponse = await axios.post(
+          'https://api.openai.com/v1/chat/completions',
+          visionPayload,
+          {
+            headers: {
+              Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+              'Content-Type': 'application/json'
+            }
+          }
+        );
 
-    let resposta = '🤖 Desculpe, houve um erro ao processar sua mensagem.';
+        resposta = visionResponse.data.choices[0].message.content;
+      }
 
-    // 🧠 Chamada à OpenAI
-    try {
-      const openaiResponse = await axios.post(
+    } else if (tipo === 'ptt' || tipo === 'audio') {
+      // 🎧 TRANSCRIÇÃO DE ÁUDIO
+      const audioUrl = req.body.body?.url;
+      const localPath = path.join(__dirname, 'audio.ogg');
+
+      const writer = fs.createWriteStream(localPath);
+      const audioStream = await new Promise((resolve) =>
+        https.get(audioUrl, (stream) => resolve(stream.pipe(writer)))
+      );
+
+      await new Promise((resolve) => writer.on('finish', resolve));
+
+      const formData = new FormData();
+      formData.append('file', fs.createReadStream(localPath));
+      formData.append('model', 'whisper-1');
+
+      const whisperResp = await axios.post(
+        'https://api.openai.com/v1/audio/transcriptions',
+        formData,
+        {
+          headers: {
+            Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+            ...formData.getHeaders()
+          }
+        }
+      );
+
+      const transcricao = whisperResp.data.text;
+      resposta = `Você disse: "${transcricao}"`;
+
+      historicoConversas[numero].push({ role: 'user', content: transcricao });
+    } else {
+      // 💬 MENSAGEM DE TEXTO NORMAL
+      historicoConversas[numero].push({ role: 'user', content: mensagemTexto });
+
+      const mensagens = [
+        {
+          role: 'system',
+          content: `
+Você é a Leona, uma atendente virtual inteligente, simpática, prestativa e informal.
+Seu trabalho é responder dúvidas, gerar orçamentos, identificar materiais, e conversar como uma pessoa real.
+Nunca diga que é uma IA. Nunca peça desculpas por limitações técnicas.
+Se alguém mandar imagens ou áudio, processe com sabedoria.
+`
+        },
+        ...historicoConversas[numero].slice(-5)
+      ];
+
+      const openaiResp = await axios.post(
         'https://api.openai.com/v1/chat/completions',
         {
           model: 'gpt-3.5-turbo',
-          messages: mensagensGPT,
+          messages: mensagens,
           temperature: 0.9
         },
         {
           headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${process.env.OPENAI_API_KEY}`
+            Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+            'Content-Type': 'application/json'
           }
         }
       );
 
-      resposta = openaiResponse.data.choices[0].message.content;
+      resposta = openaiResp.data.choices[0].message.content;
       historicoConversas[numero].push({ role: 'assistant', content: resposta });
-      console.log('💬 Resposta gerada pela IA:', resposta);
-    } catch (error) {
-      console.error('❌ Erro ao gerar resposta da IA:', error.response?.data || error.message);
     }
 
-    // 🚀 Envia resposta via Z-API
-    try {
-      const zapResponse = await axios.post(
-        process.env.ZAPI_URL,
-        {
-          phone: numero,
-          message: resposta
-        },
-        {
-          headers: {
-            'Content-Type': 'application/json',
-            'Client-Token': process.env.ZAPI_KEY.trim()
-          }
+    // 🚀 Envia resposta pro WhatsApp via Z-API
+    const zapResp = await axios.post(
+      process.env.ZAPI_URL,
+      {
+        phone: numero,
+        message: resposta
+      },
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'Client-Token': process.env.ZAPI_KEY.trim()
         }
-      );
+      }
+    );
 
-      console.log('✅ Mensagem enviada com sucesso via Z-API:', zapResponse.data);
-    } catch (error) {
-      const erroMsg = error.response?.data || error.message;
-      console.error('❌ Erro ao enviar mensagem via Z-API:', erroMsg);
-    }
-  } else {
-    console.log('⚠️ Mensagem ou número inválido recebido.');
+    console.log('✅ Mensagem enviada com sucesso:', zapResp.data);
+  } catch (err) {
+    console.error('❌ ERRO:', err.response?.data || err.message);
   }
 
   res.sendStatus(200);
@@ -119,5 +175,5 @@ Se o cliente falar algo fora do contexto, redirecione com leveza e bom humor.
 // 🚀 Inicializa servidor
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`🚀 Leona bot 2.0 rodando na porta ${PORT}`);
+  console.log(`🚀 Leona 2.5 (multimídia) rodando na porta ${PORT}`);
 });
