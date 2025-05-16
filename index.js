@@ -18,13 +18,13 @@ function calcularDelay(texto) {
 }
 
 app.post("/webhook", async (req, res) => {
-  const message =
-    req.body.message ||
-    req.body.body ||
-    req.body.body?.message ||
-    req.body.text ||
-    undefined;
+  let mensagemRecebida = req.body.message || req.body.body || req.body.text || req.body;
 
+  if (typeof mensagemRecebida === "object" && mensagemRecebida.mensagem) {
+    mensagemRecebida = mensagemRecebida.mensagem;
+  }
+
+  const message = typeof mensagemRecebida === "string" ? mensagemRecebida : undefined;
   const phone = req.body.phone;
 
   console.log("👉 Mensagem recebida:", message);
