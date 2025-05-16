@@ -18,14 +18,23 @@ function calcularDelay(texto) {
 }
 
 app.post("/webhook", async (req, res) => {
-  let mensagemRecebida = req.body.message || req.body.body || req.body.text || req.body;
+  let message;
+  let phone = req.body.phone;
 
-  if (typeof mensagemRecebida === "object" && mensagemRecebida.mensagem) {
-    mensagemRecebida = mensagemRecebida.mensagem;
+  // Verifica se a mensagem está dentro de um campo "body" ou "message"
+  if (typeof req.body === "object") {
+    if (typeof req.body.message === "string") {
+      message = req.body.message;
+    } else if (typeof req.body.body === "string") {
+      message = req.body.body;
+    } else if (typeof req.body.body === "object" && req.body.body.mensagem) {
+      message = req.body.body.mensagem;
+    } else if (typeof req.body.mensagem === "string") {
+      message = req.body.mensagem;
+    } else if (req.body.body && req.body.body.text) {
+      message = req.body.body.text;
+    }
   }
-
-  const message = typeof mensagemRecebida === "string" ? mensagemRecebida : undefined;
-  const phone = req.body.phone;
 
   console.log("👉 Mensagem recebida:", message);
   console.log("👉 Número do cliente:", phone);
