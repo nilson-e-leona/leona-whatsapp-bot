@@ -1,19 +1,20 @@
 require('dotenv').config();
-
 const express = require('express');
 const axios = require('axios');
 const app = express();
 
 app.use(express.json());
 
-// Rota de verificação
+// 🌐 Endpoint de verificação
 app.get('/', (req, res) => {
   res.send('🤖 Leona bot com IA está online!');
 });
 
+// 📩 Webhook que recebe mensagens da Z-API
 app.post('/webhook', async (req, res) => {
-  console.log('📩 Corpo recebido da Z-API:', JSON.stringify(req.body, null, 2));
+  console.log('📦 Corpo recebido da Z-API:', JSON.stringify(req.body, null, 2));
 
+  // 🧩 Captura de mensagem e número
   const mensagem =
     req.body.message ||
     req.body.text?.message ||
@@ -31,9 +32,9 @@ app.post('/webhook', async (req, res) => {
     console.log('✅ Mensagem recebida:', mensagem);
     console.log('📞 Número do remetente:', numero);
 
-    let resposta = '🤖 Desculpe, houve um erro ao processar sua mensagem.';
+    let resposta = '🤖 Oi! Como posso te ajudar hoje?';
 
-    // 🔮 Consulta à IA OpenAI
+    // 🧠 Geração de resposta com OpenAI
     try {
       const openaiResponse = await axios.post(
         'https://api.openai.com/v1/chat/completions',
@@ -42,9 +43,12 @@ app.post('/webhook', async (req, res) => {
           messages: [
             {
               role: 'system',
-              content: 'Você é a Leona, uma atendente virtual simpática e prestativa.'
+              content: 'Você é a Leona, uma atendente virtual simpática, cordial e eficiente.'
             },
-            { role: 'user', content: mensagem }
+            {
+              role: 'user',
+              content: mensagem
+            }
           ],
           temperature: 0.7
         },
@@ -62,8 +66,10 @@ app.post('/webhook', async (req, res) => {
       console.error('❌ Erro ao chamar a OpenAI:', error.response?.data || error.message);
     }
 
-    // 🚀 Envio para WhatsApp via Z-API com TOKEN FIXO
+    // 🚀 Envio da resposta via Z-API com token de segurança da conta
     try {
+      console.log('🔐 Enviando com Client-Token:', process.env.ZAPI_KEY);
+
       const zapResponse = await axios.post(
         process.env.ZAPI_URL,
         {
@@ -73,7 +79,7 @@ app.post('/webhook', async (req, res) => {
         {
           headers: {
             'Content-Type': 'application/json',
-            'Client-Token': '3679A7289C5BB4A2EC5561A3' // TOKEN FIXO DIRETO AQUI
+            'Client-Token': process.env.ZAPI_KEY.trim()
           }
         }
       );
@@ -90,7 +96,7 @@ app.post('/webhook', async (req, res) => {
   res.sendStatus(200);
 });
 
-// Inicialização do servidor
+// 🚀 Inicializa servidor
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`🚀 Leona bot rodando na porta ${PORT}`);
