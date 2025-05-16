@@ -18,8 +18,8 @@ function calcularDelay(texto) {
 }
 
 app.post("/webhook", async (req, res) => {
-  const message = req.body.message?.text?.body;
-  const phone = req.body.contacts?.[0]?.wa_id;
+  const message = req.body.body;
+  const phone = req.body.phone;
 
   console.log("👉 Mensagem recebida:", message);
   console.log("👉 Número do cliente:", phone);
