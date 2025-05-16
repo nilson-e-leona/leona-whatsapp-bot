@@ -6,12 +6,11 @@ const app = express();
 
 app.use(express.json());
 
-// Rota de teste
+// Rota de verificação
 app.get('/', (req, res) => {
   res.send('🤖 Leona bot com IA está online!');
 });
 
-// Webhook que recebe as mensagens da Z-API
 app.post('/webhook', async (req, res) => {
   console.log('📩 Corpo recebido da Z-API:', JSON.stringify(req.body, null, 2));
 
@@ -34,7 +33,7 @@ app.post('/webhook', async (req, res) => {
 
     let resposta = '🤖 Desculpe, houve um erro ao processar sua mensagem.';
 
-    // 🔮 Gerar resposta com IA OpenAI
+    // 🔮 Consulta à IA OpenAI
     try {
       const openaiResponse = await axios.post(
         'https://api.openai.com/v1/chat/completions',
@@ -43,7 +42,7 @@ app.post('/webhook', async (req, res) => {
           messages: [
             {
               role: 'system',
-              content: 'Você é a Leona, uma atendente virtual educada, simpática e prestativa.'
+              content: 'Você é a Leona, uma atendente virtual simpática e prestativa.'
             },
             { role: 'user', content: mensagem }
           ],
@@ -63,10 +62,8 @@ app.post('/webhook', async (req, res) => {
       console.error('❌ Erro ao chamar a OpenAI:', error.response?.data || error.message);
     }
 
-    // 🚀 Envio para o WhatsApp via Z-API
+    // 🚀 Envio para WhatsApp via Z-API com TOKEN FIXO
     try {
-      console.log('🔑 Enviando com token:', process.env.ZAPI_KEY);
-
       const zapResponse = await axios.post(
         process.env.ZAPI_URL,
         {
@@ -76,7 +73,7 @@ app.post('/webhook', async (req, res) => {
         {
           headers: {
             'Content-Type': 'application/json',
-            'Client-Token': process.env.ZAPI_KEY.trim() // remove espaços invisíveis
+            'Client-Token': '3679A7289C5BB4A2EC5561A3' // TOKEN FIXO DIRETO AQUI
           }
         }
       );
@@ -93,7 +90,7 @@ app.post('/webhook', async (req, res) => {
   res.sendStatus(200);
 });
 
-// Inicia o servidor
+// Inicialização do servidor
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`🚀 Leona bot rodando na porta ${PORT}`);
