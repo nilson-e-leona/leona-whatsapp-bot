@@ -1,3 +1,5 @@
+// index.js completo com suporte ao Client-Token
+
 const express = require("express");
 const axios = require("axios");
 const bodyParser = require("body-parser");
@@ -8,7 +10,7 @@ app.use(bodyParser.json());
 
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const ZAPI_URL = process.env.ZAPI_URL;
-const ZAPI_TOKEN = process.env.ZAPI_TOKEN;
+const CLIENT_TOKEN = process.env.CLIENT_TOKEN;
 const PORT = process.env.PORT || 3000;
 
 function calcularDelay(texto) {
@@ -19,64 +21,58 @@ function calcularDelay(texto) {
 }
 
 app.post("/webhook", async (req, res) => {
+  const mensagem = req.body.message?.text?.body || req.body.mensagem || "";
+  const numero = req.body.message?.key?.remoteJid || req.body.numero || "";
+
+  console.log("Mensagem recebida:", mensagem);
+  console.log("Número do cliente:", numero);
+
+  if (!mensagem || !numero) {
+    console.log("Dados inválidos");
+    return res.sendStatus(400);
+  }
+
   try {
-    const mensagem = req.body?.mensagem;
-    const numero = req.body?.numero;
-
-    console.log("Mensagem recebida:", mensagem);
-    console.log("Número do cliente:", numero);
-
-    if (!mensagem || !numero) {
-      console.log("Dados inválidos");
-      return res.sendStatus(400);
-    }
-
-    const response = await axios.post(
+    const resposta = await axios.post(
       "https://api.openai.com/v1/chat/completions",
       {
         model: "gpt-3.5-turbo",
         messages: [
-          {
-            role: "system",
-            content: "Você é a Leona, uma vendedora especializada em gesso e drywall. Atenda com simpatia, tire dúvidas e sempre colete as seguintes informações do cliente: nome, se é engenheiro/arquiteto ou cliente final, se quer apenas o material ou também o serviço, e o endereço ou CEP. Nunca forneça preço sem antes gerar valor."
-          },
-          {
-            role: "user",
-            content: mensagem
-          }
+          { role: "system", content: "Você é uma vendedora chamada Leona especializada em gesso e drywall. Seja simpática, objetiva e muito persuasiva." },
+          { role: "user", content: mensagem },
         ],
-        temperature: 0.7
       },
       {
         headers: {
           Authorization: `Bearer ${OPENAI_API_KEY}`,
-          "Content-Type": "application/json"
-        }
+          "Content-Type": "application/json",
+        },
       }
     );
 
-    const resposta = response.data.choices[0].message.content;
-    const delay = calcularDelay(resposta);
+    const respostaIA = resposta.data.choices[0].message.content;
 
-    setTimeout(async () => {
-      await axios.post(
-        `${ZAPI_URL}/send-text`,
-        {
-          phone: numero,
-          message: resposta
+    console.log("Resposta da IA:", respostaIA);
+
+    await new Promise((resolve) => setTimeout(resolve, calcularDelay(respostaIA)));
+
+    await axios.post(
+      ZAPI_URL,
+      {
+        phone: numero.replace(/[^0-9]/g, ""),
+        message: respostaIA,
+      },
+      {
+        headers: {
+          "Content-Type": "application/json",
+          "Client-Token": CLIENT_TOKEN,
         },
-        {
-          headers: {
-            Authorization: `Bearer ${ZAPI_TOKEN}`,
-            "Content-Type": "application/json"
-          }
-        }
-      );
-    }, delay);
+      }
+    );
 
     res.sendStatus(200);
-  } catch (error) {
-    console.error("Erro ao processar a mensagem:", error?.response?.data || error);
+  } catch (erro) {
+    console.error("Erro ao processar:", erro?.response?.data || erro.message);
     res.sendStatus(500);
   }
 });
