@@ -1,4 +1,4 @@
-require('dotenv').config(); // Carrega variáveis do .env
+require('dotenv').config();
 
 const express = require('express');
 const axios = require('axios');
@@ -8,14 +8,12 @@ app.use(express.json());
 
 // Rota de teste
 app.get('/', (req, res) => {
-  res.send('✅ Leona bot está online!');
+  res.send('✅ Leona bot com IA está online!');
 });
 
-// Webhook da Z-API
 app.post('/webhook', async (req, res) => {
   console.log('📩 Corpo recebido da Z-API:', JSON.stringify(req.body, null, 2));
 
-  // Captura mensagem e número com fallback de formatos
   const mensagem =
     req.body.message ||
     req.body.text?.message ||
@@ -33,8 +31,35 @@ app.post('/webhook', async (req, res) => {
     console.log('✅ Mensagem recebida:', mensagem);
     console.log('📞 Número do remetente:', numero);
 
-    const resposta = 'Olá! 🤖 Aqui é a Leona, sua atendente virtual. Como posso te ajudar?';
+    // Gera resposta com IA
+    let resposta = '🤖 Desculpe, houve um erro ao processar sua mensagem.';
 
+    try {
+      const openaiResponse = await axios.post(
+        'https://api.openai.com/v1/chat/completions',
+        {
+          model: 'gpt-3.5-turbo',
+          messages: [
+            { role: 'system', content: 'Você é a Leona, uma assistente virtual educada, prestativa e simpática.' },
+            { role: 'user', content: mensagem }
+          ],
+          temperature: 0.7
+        },
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${process.env.OPENAI_API_KEY}`
+          }
+        }
+      );
+
+      resposta = openaiResponse.data.choices[0].message.content;
+      console.log('🧠 Resposta gerada pela IA:', resposta);
+    } catch (error) {
+      console.error('❌ Erro ao chamar a OpenAI:', error.response?.data || error.message);
+    }
+
+    // Envia resposta pro WhatsApp via Z-API
     try {
       const zapResponse = await axios.post(
         process.env.ZAPI_URL,
@@ -50,11 +75,10 @@ app.post('/webhook', async (req, res) => {
         }
       );
 
-      console.log('✅ Mensagem enviada com sucesso:', zapResponse.data);
+      console.log('✅ Mensagem enviada via Z-API:', zapResponse.data);
     } catch (error) {
       const erroMsg = error.response?.data || error.message;
-      console.error('❌ ERRO ao enviar uma resposta para o número:', numero);
-      console.error('🛠️ Detalhes:', erroMsg);
+      console.error('❌ ERRO ao enviar resposta via Z-API:', erroMsg);
     }
   } else {
     console.log('⚠️ Mensagem ou número inválido');
@@ -63,8 +87,7 @@ app.post('/webhook', async (req, res) => {
   res.sendStatus(200);
 });
 
-// Porta do servidor
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`🚀 Servidor Leona rodando na porta ${PORT}`);
+  console.log(`🚀 Servidor Leona com IA rodando na porta ${PORT}`);
 });
