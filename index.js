@@ -1,178 +1,69 @@
-require('dotenv').config();
-const express = require('express');
-const axios = require('axios');
+const express = require("express");
+const axios = require("axios");
+const bodyParser = require("body-parser");
 const app = express();
-const FormData = require('form-data');
-const fs = require('fs');
-const https = require('https');
-const path = require('path');
+require("dotenv").config();
 
-app.use(express.json());
+app.use(bodyParser.json());
 
-const historicoConversas = {};
-const ultimaMensagemEnviada = {};
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+const ZAPI_URL = process.env.ZAPI_URL;
+const ZAPI_TOKEN = process.env.ZAPI_TOKEN;
 
-app.get('/', (req, res) => {
-  res.send('🤖 Leona está viva, funcional e protegida contra loops!');
-});
+app.post("/webhook", async (req, res) => {
+  const message = req.body.message?.text?.body;
+  const phone = req.body.contacts?.[0]?.wa_id;
 
-app.post('/webhook', async (req, res) => {
-  console.log('📨 Webhook recebido:', JSON.stringify(req.body, null, 2));
-
-  const numero =
-    req.body.from ||
-    req.body.phone ||
-    req.body.telefone ||
-    req.body.body?.phone ||
-    '';
-
-  const tipo = req.body.type || req.body.body?.type || '';
-  const mensagemTexto =
-    req.body.message ||
-    req.body.text?.message ||
-    req.body.body?.text ||
-    '';
-
-  const mensagemRaw = req.body.message || req.body.text?.message || req.body.body?.text || '';
-
-  if (!numero) {
-    console.log('⚠️ Número não encontrado.');
-    return res.sendStatus(200);
+  if (!message || !phone) {
+    return res.status(400).send("Dados inválidos");
   }
-
-  // ✅ Bloqueio por conteúdo (anti-loop definitivo)
-  if (mensagemRaw && ultimaMensagemEnviada[numero] === mensagemRaw) {
-    console.log('⚠️ Mensagem ignorada (detectada como eco da última resposta da Leona)');
-    return res.sendStatus(200);
-  }
-
-  let resposta = '🤖 Desculpe, não entendi sua mensagem. Pode tentar novamente?';
-
-  if (!historicoConversas[numero]) historicoConversas[numero] = [];
 
   try {
-    if (tipo === 'image') {
-      const imageUrl = req.body.body?.url;
-      if (imageUrl) {
-        const visionPayload = {
-          model: 'gpt-4-vision-preview',
-          messages: [
-            {
-              role: 'user',
-              content: [
-                { type: 'text', text: 'Analise a imagem e me diga o que vê (parece uma lista de materiais).' },
-                { type: 'image_url', image_url: { url: imageUrl } }
-              ]
-            }
-          ],
-          max_tokens: 1000
-        };
-
-        const visionResponse = await axios.post(
-          'https://api.openai.com/v1/chat/completions',
-          visionPayload,
-          {
-            headers: {
-              Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-              'Content-Type': 'application/json'
-            }
-          }
-        );
-
-        resposta = visionResponse.data.choices[0].message.content;
-      }
-
-    } else if (tipo === 'ptt' || tipo === 'audio') {
-      const audioUrl = req.body.body?.url;
-      const localPath = path.join(__dirname, 'audio.ogg');
-
-      const writer = fs.createWriteStream(localPath);
-      const audioStream = await new Promise((resolve) =>
-        https.get(audioUrl, (stream) => resolve(stream.pipe(writer)))
-      );
-
-      await new Promise((resolve) => writer.on('finish', resolve));
-
-      const formData = new FormData();
-      formData.append('file', fs.createReadStream(localPath));
-      formData.append('model', 'whisper-1');
-
-      const whisperResp = await axios.post(
-        'https://api.openai.com/v1/audio/transcriptions',
-        formData,
-        {
-          headers: {
-            Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-            ...formData.getHeaders()
-          }
-        }
-      );
-
-      const transcricao = whisperResp.data.text;
-      resposta = `Você disse: "${transcricao}"`;
-      historicoConversas[numero].push({ role: 'user', content: transcricao });
-    } else {
-      historicoConversas[numero].push({ role: 'user', content: mensagemTexto });
-
-      const mensagens = [
-        {
-          role: 'system',
-          content: `
-Você é a Leona, uma atendente virtual inteligente, simpática, prestativa e informal.
-Seu trabalho é responder dúvidas, gerar orçamentos, identificar materiais, e conversar como uma pessoa real.
-Nunca diga que é uma IA. Nunca peça desculpas por limitações técnicas.
-Se alguém mandar imagens ou áudio, processe com sabedoria.
-`
-        },
-        ...historicoConversas[numero].slice(-5)
-      ];
-
-      const openaiResp = await axios.post(
-        'https://api.openai.com/v1/chat/completions',
-        {
-          model: 'gpt-3.5-turbo',
-          messages: mensagens,
-          temperature: 0.9
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-            'Content-Type': 'application/json'
-          }
-        }
-      );
-
-      resposta = openaiResp.data.choices[0].message.content;
-      historicoConversas[numero].push({ role: 'assistant', content: resposta });
-    }
-
-    // Salva última mensagem enviada
-    ultimaMensagemEnviada[numero] = resposta;
-
-    // ✅ Envia resposta via Z-API
-    const zapResp = await axios.post(
-      process.env.ZAPI_URL,
+    // Requisição para OpenAI
+    const openaiResponse = await axios.post(
+      "https://api.openai.com/v1/chat/completions",
       {
-        phone: numero,
-        message: resposta
+        model: "gpt-4",
+        messages: [
+          {
+            role: "system",
+            content:
+              "Você é Leona, uma vendedora especialista da loja de gesso e drywall. Atenda com simpatia, rapidez e foco em fechar vendas. Responda como se fosse uma humana experiente no ramo, tirando dúvidas, ajudando na escolha dos materiais, e oferecendo orçamentos."
+          },
+          {
+            role: "user",
+            content: message
+          }
+        ],
+        temperature: 0.7
       },
       {
         headers: {
-          'Content-Type': 'application/json',
-          'Client-Token': process.env.ZAPI_KEY.trim()
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${OPENAI_API_KEY}`
         }
       }
     );
 
-    console.log('✅ Mensagem enviada com sucesso:', zapResp.data);
-  } catch (err) {
-    console.error('❌ ERRO:', err.response?.data || err.message);
-  }
+    const reply = openaiResponse.data.choices[0].message.content;
 
-  res.sendStatus(200);
+    // Envia a resposta pelo WhatsApp via Z-API
+    await axios.post(
+      `${ZAPI_URL}/sendMessage?token=${ZAPI_TOKEN}`,
+      {
+        phone: phone,
+        body: reply
+      }
+    );
+
+    res.sendStatus(200);
+  } catch (err) {
+    console.error("Erro:", err.response?.data || err.message);
+    res.sendStatus(500);
+  }
 });
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`🚀 Leona está rodando com escudo anti-loop na porta ${PORT}`);
+  console.log(`Servidor rodando na porta ${PORT}`);
 });
