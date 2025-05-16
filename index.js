@@ -4,50 +4,50 @@ const app = express();
 
 app.use(express.json());
 
-// Rota padrão
 app.get('/', (req, res) => {
   res.send('Leona bot está online!');
 });
 
-// Rota para receber mensagens da Z-API
-app.post('/webhook', async (req, res) => {
+app.post('/', async (req, res) => {
   console.log('📩 Corpo recebido da Z-API:', JSON.stringify(req.body, null, 2));
 
-  const mensagem = req.body.message?.text?.body || '';
-  const numero = req.body.message?.from || '';
+  // CAPTURA CORRETA com base no seu log real
+  const mensagem = req.body.text?.message || '';
+  const numero = req.body.phone || '';
 
-  // Verifica se tem mensagem e número
   if (mensagem && numero) {
     console.log('✅ Mensagem recebida:', mensagem);
 
     const resposta = 'Olá! 👋 Aqui é a Leona, sua atendente virtual. Como posso te ajudar?';
 
     try {
-      await axios.post(process.env.ZAPI_URL, {
-        phone: numero,
-        message: resposta
-      }, {
-        headers: {
-          'Content-Type': 'application/json'
+      await axios.post(
+        process.env.ZAPI_URL,
+        {
+          phone: numero,
+          message: resposta
         },
-        params: {
-          token: process.env.ZAPI_KEY
+        {
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          params: {
+            token: process.env.ZAPI_KEY
+          }
         }
-      });
+      );
 
-      console.log('✅ Mensagem enviada com sucesso!');
-    } catch (error) {
-      console.error('❌ Erro ao enviar a resposta:', error.message);
+      console.log('✅ Resposta enviada para:', numero);
+    } catch (erro) {
+      console.error('❌ Erro ao enviar resposta:', erro.message);
     }
   } else {
-    console.log('⚠️ Mensagem ou número inválido');
+    console.warn('⚠️ Mensagem ou número inválido (vazios)');
   }
 
-  // Sempre responde 200 para a Z-API
   res.sendStatus(200);
 });
 
-// Inicia servidor
 app.listen(3000, () => {
-  console.log('🚀 Servidor rodando na porta 3000');
+  console.log('🚀 Servidor Leona rodando na porta 3000');
 });
