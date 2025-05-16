@@ -18,24 +18,21 @@ function calcularDelay(texto) {
 }
 
 app.post("/webhook", async (req, res) => {
-  console.log("🕵️ Dados recebidos do webhook:", JSON.stringify(req.body, null, 2));
-
   let message;
-  let phone;
+  let phone = req.body.phone;
 
-  // Exemplo de parsing genérico. Ajuste conforme o payload exato da Z-API.
-  if (req.body?.message) {
-    message = req.body.message?.text || req.body.message?.body || req.body.message;
-    phone = req.body.phone;
-  } else if (req.body?.body?.text) {
-    message = req.body.body.text;
-    phone = req.body.phone;
-  } else if (req.body?.body?.mensagem) {
-    message = req.body.body.mensagem;
-    phone = req.body.phone;
-  } else if (req.body?.mensagem) {
-    message = req.body.mensagem;
-    phone = req.body.phone;
+  if (typeof req.body === "object") {
+    if (typeof req.body.message === "string") {
+      message = req.body.message;
+    } else if (typeof req.body.body === "string") {
+      message = req.body.body;
+    } else if (typeof req.body.body === "object" && req.body.body.mensagem) {
+      message = req.body.body.mensagem;
+    } else if (typeof req.body.mensagem === "string") {
+      message = req.body.mensagem;
+    } else if (req.body.body && req.body.body.text) {
+      message = req.body.body.text;
+    }
   }
 
   console.log("👉 Mensagem recebida:", message);
@@ -72,6 +69,8 @@ app.post("/webhook", async (req, res) => {
       }
     );
 
+    console.log("🧠 Resposta completa da OpenAI:", openaiResponse.data);
+
     const reply = openaiResponse.data?.choices?.[0]?.message?.content;
 
     if (!reply) {
@@ -98,7 +97,7 @@ app.post("/webhook", async (req, res) => {
   }
 });
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 1000;
 app.listen(PORT, () => {
   console.log(`🚀 Servidor rodando na porta ${PORT}`);
 });
