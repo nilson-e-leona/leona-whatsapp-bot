@@ -10,9 +10,10 @@ const path = require('path');
 app.use(express.json());
 
 const historicoConversas = {};
+const ultimaMensagemEnviada = {};
 
 app.get('/', (req, res) => {
-  res.send('🤖 Leona IA multimídia está online!');
+  res.send('🤖 Leona está viva, funcional e protegida contra loops!');
 });
 
 app.post('/webhook', async (req, res) => {
@@ -32,20 +33,16 @@ app.post('/webhook', async (req, res) => {
     req.body.body?.text ||
     '';
 
-  const enviadaPorMim =
-    req.body.fromMe === true ||
-    req.body.self === true ||
-    req.body.author === numero ||
-    req.body.ack === 1;
-
-  // 🔒 BLOQUEIO DE AUTO-RESPOSTA (anti-loop completo)
-  if (enviadaPorMim) {
-    console.log('⚠️ Ignorado: mensagem enviada pela própria Leona (bloqueio anti-loop ativo)');
-    return res.sendStatus(200);
-  }
+  const mensagemRaw = req.body.message || req.body.text?.message || req.body.body?.text || '';
 
   if (!numero) {
     console.log('⚠️ Número não encontrado.');
+    return res.sendStatus(200);
+  }
+
+  // ✅ Bloqueio por conteúdo (anti-loop definitivo)
+  if (mensagemRaw && ultimaMensagemEnviada[numero] === mensagemRaw) {
+    console.log('⚠️ Mensagem ignorada (detectada como eco da última resposta da Leona)');
     return res.sendStatus(200);
   }
 
@@ -149,7 +146,10 @@ Se alguém mandar imagens ou áudio, processe com sabedoria.
       historicoConversas[numero].push({ role: 'assistant', content: resposta });
     }
 
-    // 🚀 Envia resposta para o WhatsApp via Z-API
+    // Salva última mensagem enviada
+    ultimaMensagemEnviada[numero] = resposta;
+
+    // ✅ Envia resposta via Z-API
     const zapResp = await axios.post(
       process.env.ZAPI_URL,
       {
@@ -174,5 +174,5 @@ Se alguém mandar imagens ou áudio, processe com sabedoria.
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`🚀 Leona 2.6 multimídia rodando na porta ${PORT}`);
+  console.log(`🚀 Leona está rodando com escudo anti-loop na porta ${PORT}`);
 });
