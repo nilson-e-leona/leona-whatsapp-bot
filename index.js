@@ -4,25 +4,25 @@ const app = express();
 
 app.use(express.json());
 
-// Rota para checar se o bot está online
+// Rota GET para testar se está online
 app.get('/', (req, res) => {
   res.send('Leona bot está online!');
 });
 
-// Rota correta para receber as mensagens da Z-API
-app.post('/webhook', async (req, res) => {
+// Rota POST para receber mensagens da Z-API
+app.post('/', async (req, res) => {
+  console.log('📩 Corpo recebido da Z-API:', JSON.stringify(req.body, null, 2));
+
   const mensagem = req.body.message?.text?.body || '';
   const numero = req.body.message?.from;
 
   // Verifica se a mensagem e o número existem
   if (mensagem && numero) {
-    console.log('📩 Mensagem recebida:', mensagem);
+    console.log('📨 Mensagem recebida:', mensagem);
 
-    // Mensagem de resposta da Leona
     const resposta = 'Olá! 👋 Aqui é a Leona, sua atendente virtual. Como posso te ajudar?';
 
     try {
-      // Envia resposta pela API da Z-API
       await axios.post(
         process.env.ZAPI_URL,
         {
@@ -38,6 +38,7 @@ app.post('/webhook', async (req, res) => {
           }
         }
       );
+
       console.log('✅ Mensagem enviada com sucesso!');
     } catch (error) {
       console.error('❌ Erro ao enviar a resposta:', error.message);
@@ -47,7 +48,7 @@ app.post('/webhook', async (req, res) => {
   res.sendStatus(200);
 });
 
-// Inicia o servidor
+// Porta padrão para Render
 app.listen(3000, () => {
   console.log('🚀 Servidor rodando na porta 3000');
 });
