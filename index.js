@@ -8,7 +8,7 @@ app.get('/', (req, res) => {
   res.send('Leona bot está online!');
 });
 
-app.post('/', async (req, res) => {
+app.post('/webhook', async (req, res) => {
   const mensagem = req.body.message?.text?.body || '';
   const numero = req.body.message?.from;
 
