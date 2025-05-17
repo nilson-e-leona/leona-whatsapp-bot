@@ -23,22 +23,23 @@ function calcularAtraso(texto) {
 }
 
 app.post("/webhook", async (req, res) => {
-  console.log("🔎 PAYLOAD COMPLETO:");
+  console.log("🧩 PAYLOAD RECEBIDO:");
   console.log(JSON.stringify(req.body, null, 2));
 
-  const telefone = req.body.telefone;
-  const mensagem = req.body.texto?.mensagem;
+  // ⛳ Aqui está o acesso certo baseado no payload da sua imagem
+  const numero = req.body.telefone;
+  const mensagem = req.body.texto && req.body.texto.mensagem;
 
-  console.log("📱 Número do cliente:", telefone);
-  console.log("✉️ Mensagem recebida:", mensagem);
+  console.log("📱 Número do cliente:", numero);
+  console.log("💬 Mensagem recebida:", mensagem);
 
-  if (!telefone || !mensagem) {
+  if (!numero || !mensagem) {
     console.log("❌ Dados inválidos");
     return res.sendStatus(400);
   }
 
   try {
-    const respostaIA = await axios.post(
+    const resposta = await axios.post(
       "https://api.openai.com/v1/chat/completions",
       {
         model: "gpt-3.5-turbo",
@@ -61,19 +62,19 @@ app.post("/webhook", async (req, res) => {
       }
     );
 
-    const respostaTexto = respostaIA.data.choices[0].message.content;
-    console.log("🤖 Resposta da IA:", respostaTexto);
+    const respostaIA = resposta.data.choices[0].message.content;
+    console.log("🤖 Resposta da IA:", respostaIA);
 
-    await delay(calcularAtraso(respostaTexto));
+    await delay(calcularAtraso(respostaIA));
 
     const payloadZAPI = {
-      phone: telefone.replace(/\D/g, ""),
-      message: respostaTexto
+      phone: numero.replace(/\D/g, ""),
+      message: respostaIA
     };
 
     const headersZAPI = {
       "Content-Type": "application/json",
-      "Token": ZAPI_TOKEN
+      Token: ZAPI_TOKEN
     };
 
     const envio = await axios.post(ZAPI_URL, payloadZAPI, { headers: headersZAPI });
