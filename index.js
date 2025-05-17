@@ -1,4 +1,4 @@
-// index.js - Leona IA Vendedora Ativada 🚀
+// index.js - Diagnóstico + IA ativada
 
 const express = require("express");
 const axios = require("axios");
@@ -21,9 +21,13 @@ function calcularAtraso(texto) {
 }
 
 app.post("/webhook", async (req, res) => {
+  // NOVO: LOG COMPLETO DO CORPO
+  console.log("🧩 req.body COMPLETO:");
+  console.log(JSON.stringify(req.body, null, 2));
+
   try {
-    const mensagem = req.body.texto?.mensagem || "";
-    const numero = req.body.telefone || "";
+    const mensagem = req.body?.texto?.mensagem || "";
+    const numero = req.body?.telefone || "";
 
     console.log("📨 Mensagem recebida:", mensagem);
     console.log("📱 Número do cliente:", numero);
