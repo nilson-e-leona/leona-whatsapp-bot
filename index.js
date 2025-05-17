@@ -28,8 +28,8 @@ app.post("/webhook", async (req, res) => {
 
   // ACESSO 100% COMPATÍVEL COM SEU PAYLOAD
   const numero = req.body.telefone;
-  const mensagem = req.body.texto?.mensagem;
-
+const mensagem = req.body.texto?.mensagem;
+  
   console.log("📱 Número do cliente:", numero);
   console.log("💬 Mensagem recebida:", mensagem);
 
