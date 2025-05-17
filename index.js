@@ -33,7 +33,6 @@ app.post("/webhook", async (req, res) => {
       return res.sendStatus(400);
     }
 
-    // Chamada pra OpenAI
     const resposta = await axios.post(
       "https://api.openai.com/v1/chat/completions",
       {
@@ -60,20 +59,18 @@ app.post("/webhook", async (req, res) => {
     const respostaIA = resposta.data.choices[0].message.content;
     console.log("🤖 Resposta da IA:", respostaIA);
 
-    // Delay opcional
     await new Promise(resolve => setTimeout(resolve, calcularAtraso(respostaIA)));
 
-    // Envio via Z-API
     await axios.post(
       ZAPI_URL,
       {
-        phone: numero.replace(/\D/g, ""), // Remove símbolos
+        phone: numero.replace(/\D/g, ""),
         message: respostaIA
       },
       {
         headers: {
           "Content-Type": "application/json",
-          "Token": ZAPI_TOKEN
+          Token: ZAPI_TOKEN
         }
       }
     );
