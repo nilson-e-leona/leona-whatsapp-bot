@@ -26,9 +26,9 @@ app.post("/webhook", async (req, res) => {
   console.log("🧩 PAYLOAD RECEBIDO:");
   console.log(JSON.stringify(req.body, null, 2));
 
-  // ⛳ Aqui está o acesso certo baseado no payload da sua imagem
+  // ACESSO 100% COMPATÍVEL COM SEU PAYLOAD
   const numero = req.body.telefone;
-  const mensagem = req.body.texto && req.body.texto.mensagem;
+  const mensagem = req.body.texto?.mensagem;
 
   console.log("📱 Número do cliente:", numero);
   console.log("💬 Mensagem recebida:", mensagem);
@@ -67,22 +67,24 @@ app.post("/webhook", async (req, res) => {
 
     await delay(calcularAtraso(respostaIA));
 
-    const payloadZAPI = {
-      phone: numero.replace(/\D/g, ""),
-      message: respostaIA
-    };
+    await axios.post(
+      ZAPI_URL,
+      {
+        phone: numero.replace(/\D/g, ""),
+        message: respostaIA
+      },
+      {
+        headers: {
+          "Content-Type": "application/json",
+          Token: ZAPI_TOKEN
+        }
+      }
+    );
 
-    const headersZAPI = {
-      "Content-Type": "application/json",
-      Token: ZAPI_TOKEN
-    };
-
-    const envio = await axios.post(ZAPI_URL, payloadZAPI, { headers: headersZAPI });
-    console.log("✅ Mensagem enviada via ZAPI:", envio.status);
-
+    console.log("✅ Mensagem enviada via ZAPI");
     return res.sendStatus(200);
   } catch (error) {
-    console.error("💥 Erro ao processar ou enviar:", error?.response?.data || error.message);
+    console.error("💥 Erro:", error?.response?.data || error.message);
     return res.sendStatus(500);
   }
 });
