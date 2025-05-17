@@ -1,4 +1,4 @@
-// index.js - Modo Diagnóstico da Leona 🤖
+// index.js - Leona IA Vendedora Ativada 🚀
 
 const express = require("express");
 const axios = require("axios");
@@ -8,10 +8,10 @@ require("dotenv").config();
 const app = express();
 app.use(bodyParser.json());
 
-const ABRIR_CHAVE_API_AI = process.env.OPENAI_API_KEY;
-const URL_ZAPI = process.env.ZAPI_URL;
-const TOKEN_DO_CLIENTE = process.env.ZAPI_TOKEN;
-const PORTA = process.env.PORT || 3000;
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+const ZAPI_URL = process.env.ZAPI_URL;
+const ZAPI_TOKEN = process.env.ZAPI_TOKEN;
+const PORT = process.env.PORT || 3000;
 
 function calcularAtraso(texto) {
   const tamanho = texto.length;
@@ -21,14 +21,70 @@ function calcularAtraso(texto) {
 }
 
 app.post("/webhook", async (req, res) => {
-  // 👁️ Loga tudo o que chega
-  console.log("🔥 PAYLOAD RECEBIDO DA Z-API:");
-  console.log(JSON.stringify(req.body, null, 2));
+  try {
+    const mensagem = req.body.texto?.mensagem || "";
+    const numero = req.body.telefone || "";
 
-  // Envia só um "ok" para a Z-API não acusar erro
-  res.sendStatus(200);
+    console.log("📨 Mensagem recebida:", mensagem);
+    console.log("📱 Número do cliente:", numero);
+
+    if (!mensagem || !numero) {
+      console.log("❌ Dados inválidos");
+      return res.sendStatus(400);
+    }
+
+    // Chamada pra OpenAI
+    const resposta = await axios.post(
+      "https://api.openai.com/v1/chat/completions",
+      {
+        model: "gpt-3.5-turbo",
+        messages: [
+          {
+            role: "system",
+            content: "Você é uma vendedora chamada Leona especializada em gesso e drywall. Seja simpática, objetiva e muito persuasiva."
+          },
+          {
+            role: "user",
+            content: mensagem
+          }
+        ]
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${OPENAI_API_KEY}`,
+          "Content-Type": "application/json"
+        }
+      }
+    );
+
+    const respostaIA = resposta.data.choices[0].message.content;
+    console.log("🤖 Resposta da IA:", respostaIA);
+
+    // Delay opcional
+    await new Promise(resolve => setTimeout(resolve, calcularAtraso(respostaIA)));
+
+    // Envio via Z-API
+    await axios.post(
+      ZAPI_URL,
+      {
+        phone: numero.replace(/\D/g, ""), // Remove símbolos
+        message: respostaIA
+      },
+      {
+        headers: {
+          "Content-Type": "application/json",
+          "Token": ZAPI_TOKEN
+        }
+      }
+    );
+
+    res.sendStatus(200);
+  } catch (erro) {
+    console.error("💥 Erro ao processar:", erro?.response?.data || erro.message);
+    res.sendStatus(500);
+  }
 });
 
-app.listen(PORTA, () => {
-  console.log(`🟢 Servidor rodando na porta ${PORTA}`);
+app.listen(PORT, () => {
+  console.log(`🟢 Servidor rodando na porta ${PORT}`);
 });
