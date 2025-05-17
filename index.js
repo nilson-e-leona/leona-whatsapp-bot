@@ -1,5 +1,3 @@
-// index.js - Diagnóstico + IA ativada
-
 const express = require("express");
 const axios = require("axios");
 const bodyParser = require("body-parser");
@@ -21,13 +19,12 @@ function calcularAtraso(texto) {
 }
 
 app.post("/webhook", async (req, res) => {
-  // NOVO: LOG COMPLETO DO CORPO
-  console.log("🧩 req.body COMPLETO:");
-  console.log(JSON.stringify(req.body, null, 2));
-
   try {
-    const mensagem = req.body?.texto?.mensagem || "";
-    const numero = req.body?.telefone || "";
+    // LOG REAL
+    console.log("🧩 req.body:", JSON.stringify(req.body, null, 2));
+
+    const mensagem = req.body?.texto?.mensagem;
+    const numero = req.body?.telefone;
 
     console.log("📨 Mensagem recebida:", mensagem);
     console.log("📱 Número do cliente:", numero);
@@ -37,6 +34,7 @@ app.post("/webhook", async (req, res) => {
       return res.sendStatus(400);
     }
 
+    // OpenAI request
     const resposta = await axios.post(
       "https://api.openai.com/v1/chat/completions",
       {
